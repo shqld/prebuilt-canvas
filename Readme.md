@@ -27,7 +27,7 @@ If your dependencies use `canvas` internally, use overrides to replace it:
 ```json
 {
   "overrides": {
-    "canvas": "npm:prebuilt-canvas@^3"
+    "canvas": "npm:prebuilt-canvas@3.2.2-rc.2"
   }
 }
 ```
@@ -36,7 +36,7 @@ If your dependencies use `canvas` internally, use overrides to replace it:
 ```json
 {
   "resolutions": {
-    "canvas": "npm:prebuilt-canvas@^3"
+    "canvas": "npm:prebuilt-canvas@3.2.2-rc.2"
   }
 }
 ```
@@ -46,15 +46,15 @@ If your dependencies use `canvas` internally, use overrides to replace it:
 {
   "pnpm": {
     "overrides": {
-      "canvas": "npm:prebuilt-canvas@^3"
+      "canvas": "npm:prebuilt-canvas@3.2.2-rc.2"
     }
   }
 }
 ```
 
-For v2: replace `@^3` with `@^2`.
+For v2: replace `3.2.2-rc.2` with `2.11.2-rc.2`.
 
-**Important**: Always specify a version range (`@^3`, `@^2`). Without it, npm uses the version your dependency requested (e.g. `canvas@2.11.0`), which may not exist as `prebuilt-canvas@2.11.0`.
+> Currently in RC. Once stable, versions like `@^3` and `@^2` will work.
 
 ### Supported platforms
 
