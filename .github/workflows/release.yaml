@@ -1,0 +1,376 @@
+name: Build and Publish Prebuilds
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  validate:
+    name: Validate package versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check optionalDependencies match package version
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const version = pkg.version;
+            const mismatched = Object.entries(pkg.optionalDependencies || {})
+              .filter(([, v]) => v !== version);
+            if (mismatched.length) {
+              console.error('optionalDependencies version mismatch:');
+              mismatched.forEach(([name, v]) =>
+                console.error('  ' + name + ': ' + v + ' (expected ' + version + ')'));
+              process.exit(1);
+            }
+            console.log('All optionalDependencies match version ' + version);
+          "
+
+  build-linux-x64:
+    name: Linux x64
+    runs-on: ubuntu-24.04
+    container:
+      image: zbbjornson/canvas-prebuilt:11
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Build
+        run: |
+          set -ex
+          npm install -g node-gyp
+          npm install --ignore-scripts
+          cp prebuild/Linux/binding.gyp binding.gyp
+          node-gyp rebuild -j 2
+          . prebuild/Linux/bundle.sh
+      - name: Test binary
+        run: |
+          set -ex
+          cd /root/harfbuzz-* && make uninstall
+          cd /root/cairo-* && make uninstall
+          cd /root/pango-* && cd _build && ninja uninstall
+          cd /root/libpng-* && make uninstall
+          cd /root/libjpeg-* && cd b && make uninstall
+          cd /root/giflib-* && make uninstall
+          cd $GITHUB_WORKSPACE
+          node test/smoke.js
+      - name: Package
+        run: node prebuild/package-platform.js linux-x64-gnu build/Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canvas-linux-x64-gnu
+          path: build/Release/
+
+  build-linux-arm64:
+    name: Linux arm64
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: chearon/canvas-prebuilt-arm:1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Build
+        run: |
+          set -ex
+          npm install -g node-gyp
+          npm install --ignore-scripts
+          cp prebuild/Linux/binding.gyp binding.gyp
+          node-gyp rebuild -j 2
+          . prebuild/Linux/bundle.sh
+      - name: Test binary
+        run: |
+          set -ex
+          cd /root/harfbuzz-* && make uninstall
+          cd /root/cairo-* && make uninstall
+          cd /root/pango-* && cd _build && ninja uninstall
+          cd /root/libpng-* && make uninstall
+          cd /root/libjpeg-* && cd b && make uninstall
+          cd /root/giflib-* && make uninstall
+          cd $GITHUB_WORKSPACE
+          node test/smoke.js
+      - name: Package
+        run: node prebuild/package-platform.js linux-arm64-gnu build/Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canvas-linux-arm64-gnu
+          path: build/Release/
+
+  build-darwin-x64:
+    name: macOS x64 (Rosetta)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rosetta
+        run: softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
+      - name: Install x86_64 Homebrew and deps
+        run: |
+          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          arch -x86_64 /usr/local/bin/brew install pkg-config cairo pango librsvg giflib
+      - name: Setup x86_64 Node.js
+        run: |
+          arch -x86_64 /bin/bash -c "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
+          arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && nvm install ${{ env.NODE_VERSION }} && nvm use ${{ env.NODE_VERSION }}"
+      - name: Build
+        run: |
+          arch -x86_64 /bin/bash -c "
+            set -ex
+            export PATH=/usr/local/bin:\$PATH
+            source ~/.nvm/nvm.sh && nvm use ${{ env.NODE_VERSION }}
+            npm install -g node-gyp
+            npm install --ignore-scripts
+            cp prebuild/macOS/binding.gyp binding.gyp
+            node-gyp rebuild -j 2
+            pip3 install --user --break-system-packages macpack
+            . prebuild/macOS/bundle.sh
+          "
+      - name: Verify architecture
+        run: file build/Release/canvas.node | grep x86_64
+      - name: Sign
+        run: |
+          for file in build/Release/*; do
+            codesign --deep --force --sign - "$file"
+          done
+      - name: Test binary
+        run: |
+          arch -x86_64 /bin/bash -c "
+            export PATH=/usr/local/bin:\$PATH
+            source ~/.nvm/nvm.sh && nvm use ${{ env.NODE_VERSION }}
+            brew uninstall --force --ignore-dependencies cairo pango librsvg giflib harfbuzz 2>/dev/null || true
+            node test/smoke.js
+          "
+      - name: Package
+        run: node prebuild/package-platform.js darwin-x64 build/Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canvas-darwin-x64
+          path: build/Release/
+
+  build-darwin-arm64:
+    name: macOS arm64
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install deps
+        run: . prebuild/macOS/preinstall.sh
+      - name: Build
+        run: |
+          set -ex
+          npm install -g node-gyp
+          npm install --ignore-scripts
+          cp prebuild/macOS/binding.gyp binding.gyp
+          node-gyp rebuild -j 2
+          . prebuild/macOS/bundle.sh
+      - name: Sign
+        run: |
+          for file in build/Release/*; do
+            codesign --deep --force --sign - "$file"
+          done
+      - name: Test binary
+        run: |
+          brew uninstall --force --ignore-dependencies cairo pango librsvg giflib harfbuzz
+          node test/smoke.js
+      - name: Package
+        run: node prebuild/package-platform.js darwin-arm64 build/Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canvas-darwin-arm64
+          path: build/Release/
+
+  build-win32-x64:
+    name: Windows x64
+    runs-on: windows-2025
+    steps:
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install deps
+        run: msys2 -c ". prebuild/Windows/preinstall.sh"
+      - name: Build
+        run: |
+          npm install -g node-gyp
+          npm install --ignore-scripts
+          msys2 -c "cp prebuild/Windows/binding.gyp binding.gyp"
+          node-gyp rebuild -j 2
+      - name: Bundle
+        shell: msys2 {0}
+        run: . prebuild/Windows/bundle.sh
+      - name: Test binary
+        # Run outside msys2 to verify DLLs are bundled
+        run: node test/smoke.js
+      - name: Package
+        run: node prebuild/package-platform.js win32-x64 build/Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canvas-win32-x64
+          path: build/Release/
+
+  publish:
+    name: Publish to npm
+    needs:
+      - validate
+      - build-linux-x64
+      - build-linux-arm64
+      - build-darwin-x64
+      - build-darwin-arm64
+      - build-win32-x64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      # Publish each platform package first
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -ex
+          for dir in artifacts/canvas-*/; do
+            echo "Publishing $(cat $dir/package.json | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).name')"
+            cd "$dir"
+            npm publish --access public
+            cd "$GITHUB_WORKSPACE"
+          done
+
+      # Wait for all platform packages to be available on the registry
+      - name: Wait for registry propagation
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PACKAGES=$(node -p "Object.keys(require('./package.json').optionalDependencies || {}).join(' ')")
+          TIMEOUT=120
+          INTERVAL=5
+          for pkg in $PACKAGES; do
+            echo "Waiting for ${pkg}@${VERSION}..."
+            elapsed=0
+            while true; do
+              if npm view "${pkg}@${VERSION}" version 2>/dev/null | grep -q "${VERSION}"; then
+                echo "  ${pkg}@${VERSION} available"
+                break
+              fi
+              if [ "$elapsed" -ge "$TIMEOUT" ]; then
+                echo "ERROR: Timed out waiting for ${pkg}@${VERSION}" >&2
+                exit 1
+              fi
+              sleep $INTERVAL
+              elapsed=$((elapsed + INTERVAL))
+            done
+          done
+          echo "All platform packages available."
+
+      # Publish main package
+      - name: Publish main package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+  verify:
+    name: Verify (${{ matrix.name }})
+    needs: [publish]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-24.04
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+          - name: darwin-arm64
+            os: macos-15
+          - name: darwin-x64
+            os: macos-15
+            rosetta: true
+          - name: win32-x64
+            os: windows-2025
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-node@v4
+        if: ${{ !matrix.rosetta }}
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Rosetta + x64 Node.js
+        if: ${{ matrix.rosetta }}
+        run: |
+          softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
+          arch -x86_64 /bin/bash -c "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
+          arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && nvm install ${{ env.NODE_VERSION }}"
+
+      - name: Install and verify
+        if: ${{ !matrix.rosetta }}
+        shell: bash
+        run: |
+          set -ex
+          npm cache clean --force
+          mkdir test-install && cd test-install
+          npm init -y
+          npm install prebuilt-canvas@${GITHUB_REF_NAME#v}
+          node -e "
+            const assert = require('assert');
+            const c = require('prebuilt-canvas');
+            assert(c.cairoVersion, 'cairoVersion missing');
+            const cv = c.createCanvas(100, 100);
+            cv.getContext('2d').fillRect(0, 0, 100, 100);
+            assert(cv.toBuffer('image/png').length > 100, 'PNG too small');
+            console.log('OK: ' + process.platform + '-' + process.arch + ' cairo=' + c.cairoVersion);
+          "
+
+      - name: Install and verify (Rosetta)
+        if: ${{ matrix.rosetta }}
+        run: |
+          arch -x86_64 /bin/bash -c "
+            set -ex
+            source ~/.nvm/nvm.sh && nvm use ${{ env.NODE_VERSION }}
+            mkdir test-install && cd test-install
+            npm init -y
+            npm install prebuilt-canvas@${GITHUB_REF_NAME#v}
+            node -e \"
+              const assert = require('assert');
+              const c = require('prebuilt-canvas');
+              assert(c.cairoVersion, 'cairoVersion missing');
+              const cv = c.createCanvas(100, 100);
+              cv.getContext('2d').fillRect(0, 0, 100, 100);
+              assert(cv.toBuffer('image/png').length > 100, 'PNG too small');
+              console.log('OK: ' + process.platform + '-' + process.arch + ' cairo=' + c.cairoVersion);
+            \"
+          "
+
+      - name: Test package managers (Linux only)
+        if: matrix.name == 'linux-x64'
+        run: |
+          set -ex
+          TAG=${GITHUB_REF_NAME#v}
+
+          # yarn classic
+          npm install -g yarn
+          mkdir t-yarn && cd t-yarn && npm init -y
+          yarn add prebuilt-canvas@$TAG
+          node -e "require('prebuilt-canvas')"
+          cd ..
+
+          # pnpm
+          npm install -g pnpm
+          mkdir t-pnpm && cd t-pnpm && npm init -y
+          pnpm add prebuilt-canvas@$TAG
+          node -e "require('prebuilt-canvas')"

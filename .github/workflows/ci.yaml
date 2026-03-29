@@ -1,11 +1,6 @@
 name: Test
 on:
-  push:
-    paths-ignore:
-      - ".github/workflows/prebuild.yaml"
-  pull_request:
-    paths-ignore:
-      - ".github/workflows/prebuild.yaml"
+  workflow_dispatch: # disabled: tests are run upstream
 
 jobs:
   Linux:
