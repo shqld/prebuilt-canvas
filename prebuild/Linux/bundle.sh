@@ -12,7 +12,9 @@ apt-get -o Acquire::Check-Valid-Until=false update
 apt-get update
 apt install -y patchelf pax-utils
 
-copies=$(lddtree -l build/Release/canvas.node | sed -r -e '/^\/lib/d' -e '/canvas.node$/d');
+# Use any .node binary to determine shared library dependencies (all ABI builds link the same libs)
+FIRST_NODE=$(ls build/Release/canvas-node-v*.node 2>/dev/null | head -1 || echo "build/Release/canvas.node")
+copies=$(lddtree -l "$FIRST_NODE" | sed -r -e '/^\/lib/d' -e '/\.node$/d');
 
 # remove the big artifacts we will not use.
 rm -r build/Release/.deps

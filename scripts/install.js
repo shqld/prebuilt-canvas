@@ -1,5 +1,7 @@
 'use strict'
 
+const path = require('path')
+
 const PLATFORMS = {
   'darwin-arm64': '@prebuilt-canvas/darwin-arm64',
   'darwin-x64': '@prebuilt-canvas/darwin-x64',
@@ -20,29 +22,35 @@ if (process.platform === 'linux') {
   }
 }
 
-// Supported platform: check package exists, done
-if (PLATFORMS[key]) {
+const abi = process.versions.modules
+const packageName = PLATFORMS[key]
+
+// Supported platform: check ABI-specific binary exists
+if (packageName) {
   try {
-    require.resolve(`${PLATFORMS[key]}/package.json`)
+    const pkgDir = path.dirname(require.resolve(`${packageName}/package.json`))
+    const binary = path.join(pkgDir, `canvas-node-v${abi}.node`)
+    require.resolve(binary)
     process.exit(0)
   } catch (_) {
-    // Platform package missing. Try explicit install (esbuild-style fallback)
+    // Platform package missing or no binary for this ABI.
+    // Try explicit install (esbuild-style fallback)
     try {
       const version = require('../package.json').version
       require('child_process').execSync(
-        `npm install ${PLATFORMS[key]}@${version}`,
-        { stdio: 'inherit', cwd: require('path').resolve(__dirname, '..') }
+        `npm install ${packageName}@${version}`,
+        { stdio: 'inherit', cwd: path.resolve(__dirname, '..') }
       )
       process.exit(0)
     } catch (_) {}
   }
 }
 
-// Unsupported platform or platform package unavailable: node-gyp
+// Unsupported platform or no binary for this ABI: node-gyp
 try {
   require('child_process').execSync('node-gyp rebuild', {
     stdio: 'inherit',
-    cwd: require('path').resolve(__dirname, '..')
+    cwd: path.resolve(__dirname, '..')
   })
 } catch (_) {
   console.error('Failed to build canvas from source.')

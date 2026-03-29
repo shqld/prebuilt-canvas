@@ -14,40 +14,40 @@ const PLATFORM_CONFIGS = {
     os: ['linux'],
     cpu: ['x64'],
     libc: ['glibc'],
-    files: ['canvas.node', '*.so*']
+    files: ['canvas-node-v*.node', '*.so*']
   },
   'linux-arm64-gnu': {
     os: ['linux'],
     cpu: ['arm64'],
     libc: ['glibc'],
-    files: ['canvas.node', '*.so*']
+    files: ['canvas-node-v*.node', '*.so*']
   },
   'linux-x64-musl': {
     os: ['linux'],
     cpu: ['x64'],
     libc: ['musl'],
-    files: ['canvas.node', '*.so*']
+    files: ['canvas-node-v*.node', '*.so*']
   },
   'linux-arm64-musl': {
     os: ['linux'],
     cpu: ['arm64'],
     libc: ['musl'],
-    files: ['canvas.node', '*.so*']
+    files: ['canvas-node-v*.node', '*.so*']
   },
   'darwin-x64': {
     os: ['darwin'],
     cpu: ['x64'],
-    files: ['canvas.node', '*.dylib']
+    files: ['canvas-node-v*.node', '*.dylib']
   },
   'darwin-arm64': {
     os: ['darwin'],
     cpu: ['arm64'],
-    files: ['canvas.node', '*.dylib']
+    files: ['canvas-node-v*.node', '*.dylib']
   },
   'win32-x64': {
     os: ['win32'],
     cpu: ['x64'],
-    files: ['canvas.node', '*.dll']
+    files: ['canvas-node-v*.node', '*.dll']
   }
 }
 
@@ -77,7 +77,6 @@ const pkg = {
   repository: rootPkg.repository,
   os: config.os,
   cpu: config.cpu,
-  main: 'canvas.node',
   files: config.files
 }
 

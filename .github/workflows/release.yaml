@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '22'
+  NODE_VERSIONS: '18 20 22 24'
 
 jobs:
   validate:
@@ -36,16 +36,22 @@ jobs:
       image: zbbjornson/canvas-prebuilt:11
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Build
+      - name: Build all Node versions
         run: |
           set -ex
-          npm install -g node-gyp
-          npm install --ignore-scripts
           cp prebuild/Linux/binding.gyp binding.gyp
-          node-gyp rebuild -j 2
+          for NODE_VER in $NODE_VERSIONS; do
+            echo "=== Installing Node $NODE_VER ==="
+            curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
+            NODE_FULL=$(grep 'linux-x64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-x64.tar.gz//' | sed 's/node-//')
+            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /usr/local --strip-components=1
+            ABI=$(node -p "process.versions.modules")
+            echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
+            npm install -g node-gyp
+            npm install --ignore-scripts
+            node-gyp rebuild -j 2
+            mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+          done
           . prebuild/Linux/bundle.sh
       - name: Test binary
         run: |
@@ -72,16 +78,22 @@ jobs:
       image: chearon/canvas-prebuilt-arm:1
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Build
+      - name: Build all Node versions
         run: |
           set -ex
-          npm install -g node-gyp
-          npm install --ignore-scripts
           cp prebuild/Linux/binding.gyp binding.gyp
-          node-gyp rebuild -j 2
+          for NODE_VER in $NODE_VERSIONS; do
+            echo "=== Installing Node $NODE_VER ==="
+            curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
+            NODE_FULL=$(grep 'linux-arm64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-arm64.tar.gz//' | sed 's/node-//')
+            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /usr/local --strip-components=1
+            ABI=$(node -p "process.versions.modules")
+            echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
+            npm install -g node-gyp
+            npm install --ignore-scripts
+            node-gyp rebuild -j 2
+            mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+          done
           . prebuild/Linux/bundle.sh
       - name: Test binary
         run: |
@@ -112,25 +124,30 @@ jobs:
         run: |
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           arch -x86_64 /usr/local/bin/brew install pkg-config cairo pango librsvg giflib
-      - name: Setup x86_64 Node.js
+      - name: Setup x86_64 nvm
         run: |
           arch -x86_64 /bin/bash -c "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
-          arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && nvm install ${{ env.NODE_VERSION }} && nvm use ${{ env.NODE_VERSION }}"
-      - name: Build
+      - name: Build all Node versions
         run: |
           arch -x86_64 /bin/bash -c "
             set -ex
             export PATH=/usr/local/bin:\$PATH
-            source ~/.nvm/nvm.sh && nvm use ${{ env.NODE_VERSION }}
-            npm install -g node-gyp
-            npm install --ignore-scripts
-            cp prebuild/macOS/binding.gyp binding.gyp
-            node-gyp rebuild -j 2
+            source ~/.nvm/nvm.sh
+            for NODE_VER in $NODE_VERSIONS; do
+              nvm install \$NODE_VER && nvm use \$NODE_VER
+              ABI=\$(node -p 'process.versions.modules')
+              echo \"Building for Node \$NODE_VER (ABI \$ABI)...\"
+              npm install -g node-gyp
+              npm install --ignore-scripts
+              cp prebuild/macOS/binding.gyp binding.gyp
+              node-gyp rebuild -j 2
+              mv build/Release/canvas.node build/Release/canvas-node-v\${ABI}.node
+            done
             pip3 install --user --break-system-packages macpack
             . prebuild/macOS/bundle.sh
           "
       - name: Verify architecture
-        run: file build/Release/canvas.node | grep x86_64
+        run: file build/Release/canvas-node-v*.node | grep x86_64
       - name: Sign
         run: |
           for file in build/Release/*; do
@@ -140,7 +157,7 @@ jobs:
         run: |
           arch -x86_64 /bin/bash -c "
             export PATH=/usr/local/bin:\$PATH
-            source ~/.nvm/nvm.sh && nvm use ${{ env.NODE_VERSION }}
+            source ~/.nvm/nvm.sh && nvm use 22
             brew uninstall --force --ignore-dependencies cairo pango librsvg giflib harfbuzz 2>/dev/null || true
             node test/smoke.js
           "
@@ -156,18 +173,23 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
       - name: Install deps
         run: . prebuild/macOS/preinstall.sh
-      - name: Build
+      - name: Build all Node versions
         run: |
           set -ex
-          npm install -g node-gyp
-          npm install --ignore-scripts
-          cp prebuild/macOS/binding.gyp binding.gyp
-          node-gyp rebuild -j 2
+          curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+          source ~/.nvm/nvm.sh
+          for NODE_VER in $NODE_VERSIONS; do
+            nvm install $NODE_VER && nvm use $NODE_VER
+            ABI=$(node -p "process.versions.modules")
+            echo "Building for Node $NODE_VER (ABI $ABI)..."
+            npm install -g node-gyp
+            npm install --ignore-scripts
+            cp prebuild/macOS/binding.gyp binding.gyp
+            node-gyp rebuild -j 2
+            mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+          done
           . prebuild/macOS/bundle.sh
       - name: Sign
         run: |
@@ -177,9 +199,12 @@ jobs:
       - name: Test binary
         run: |
           brew uninstall --force --ignore-dependencies cairo pango librsvg giflib harfbuzz
+          source ~/.nvm/nvm.sh && nvm use 22
           node test/smoke.js
       - name: Package
-        run: node prebuild/package-platform.js darwin-arm64 build/Release
+        run: |
+          source ~/.nvm/nvm.sh && nvm use 22
+          node prebuild/package-platform.js darwin-arm64 build/Release
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-darwin-arm64
@@ -196,22 +221,33 @@ jobs:
           update: true
           path-type: inherit
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
       - name: Install deps
         run: msys2 -c ". prebuild/Windows/preinstall.sh"
-      - name: Build
+      - name: Build all Node versions
+        shell: pwsh
         run: |
-          npm install -g node-gyp
-          npm install --ignore-scripts
           msys2 -c "cp prebuild/Windows/binding.gyp binding.gyp"
-          node-gyp rebuild -j 2
+          foreach ($NODE_VER in @(18, 20, 22, 24)) {
+            Write-Host "=== Installing Node $NODE_VER ==="
+            $indexUrl = "https://nodejs.org/dist/latest-v${NODE_VER}.x/"
+            $html = Invoke-WebRequest -Uri $indexUrl -UseBasicParsing
+            $filename = ($html.Links | Where-Object { $_.href -match "win-x64.zip$" } | Select-Object -First 1).href
+            $url = "${indexUrl}${filename}"
+            Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\node.zip"
+            Expand-Archive -Force "$env:TEMP\node.zip" -DestinationPath "$env:TEMP\node-install"
+            $nodeDir = Get-ChildItem "$env:TEMP\node-install" | Select-Object -First 1
+            $env:PATH = "$($nodeDir.FullName);$env:PATH"
+            $ABI = node -p "process.versions.modules"
+            Write-Host "Building for Node $NODE_VER (ABI $ABI)..."
+            npm install -g node-gyp
+            npm install --ignore-scripts
+            node-gyp rebuild -j 2
+            Move-Item -Force build/Release/canvas.node "build/Release/canvas-node-v$ABI.node"
+          }
       - name: Bundle
         shell: msys2 {0}
         run: . prebuild/Windows/bundle.sh
       - name: Test binary
-        # Run outside msys2 to verify DLLs are bundled
         run: node test/smoke.js
       - name: Package
         run: node prebuild/package-platform.js win32-x64 build/Release
@@ -219,6 +255,7 @@ jobs:
         with:
           name: canvas-win32-x64
           path: build/Release/
+
   publish:
     name: Publish to npm
     needs:
@@ -233,14 +270,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
 
-      # Publish each platform package first
       - name: Publish platform packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -253,7 +289,6 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           done
 
-      # Wait for all platform packages to be available on the registry
       - name: Wait for registry propagation
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -278,7 +313,6 @@ jobs:
           done
           echo "All platform packages available."
 
-      # Publish main package
       - name: Publish main package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -307,14 +341,14 @@ jobs:
       - uses: actions/setup-node@v4
         if: ${{ !matrix.rosetta }}
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 22
 
       - name: Setup Rosetta + x64 Node.js
         if: ${{ matrix.rosetta }}
         run: |
           softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
           arch -x86_64 /bin/bash -c "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
-          arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && nvm install ${{ env.NODE_VERSION }}"
+          arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && nvm install 22"
 
       - name: Wait for platform package on this CDN edge
         if: ${{ !matrix.rosetta }}
@@ -383,7 +417,7 @@ jobs:
         run: |
           arch -x86_64 /bin/bash -c "
             set -ex
-            source ~/.nvm/nvm.sh && nvm use ${{ env.NODE_VERSION }}
+            source ~/.nvm/nvm.sh && nvm use 22
             mkdir test-install && cd test-install
             npm init -y
             npm install prebuilt-canvas@${GITHUB_REF_NAME#v}
