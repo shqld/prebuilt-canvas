@@ -316,6 +316,28 @@ jobs:
           arch -x86_64 /bin/bash -c "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
           arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && nvm install ${{ env.NODE_VERSION }}"
 
+      - name: Wait for platform package on this CDN edge
+        if: ${{ !matrix.rosetta }}
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          TIMEOUT=120
+          INTERVAL=5
+          elapsed=0
+          echo "Waiting for prebuilt-canvas@${VERSION} on this edge..."
+          while true; do
+            if npm view "prebuilt-canvas@${VERSION}" version 2>/dev/null | grep -q "${VERSION}"; then
+              echo "Available."
+              break
+            fi
+            if [ "$elapsed" -ge "$TIMEOUT" ]; then
+              echo "Timed out" >&2
+              exit 1
+            fi
+            sleep $INTERVAL
+            elapsed=$((elapsed + INTERVAL))
+          done
+
       - name: Install and verify
         if: ${{ !matrix.rosetta }}
         shell: bash
@@ -334,6 +356,27 @@ jobs:
             assert(cv.toBuffer('image/png').length > 100, 'PNG too small');
             console.log('OK: ' + process.platform + '-' + process.arch + ' cairo=' + c.cairoVersion);
           "
+
+      - name: Wait for platform package on this CDN edge (Rosetta)
+        if: ${{ matrix.rosetta }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          TIMEOUT=120
+          INTERVAL=5
+          elapsed=0
+          echo "Waiting for prebuilt-canvas@${VERSION} on this edge..."
+          while true; do
+            if npm view "prebuilt-canvas@${VERSION}" version 2>/dev/null | grep -q "${VERSION}"; then
+              echo "Available."
+              break
+            fi
+            if [ "$elapsed" -ge "$TIMEOUT" ]; then
+              echo "Timed out" >&2
+              exit 1
+            fi
+            sleep $INTERVAL
+            elapsed=$((elapsed + INTERVAL))
+          done
 
       - name: Install and verify (Rosetta)
         if: ${{ matrix.rosetta }}
