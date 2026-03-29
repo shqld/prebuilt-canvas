@@ -48,6 +48,7 @@ jobs:
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
             npm install -g node-gyp
+            rm -rf node_modules
             npm install --ignore-scripts
             node-gyp rebuild -j 2
             mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
@@ -90,6 +91,7 @@ jobs:
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
             npm install -g node-gyp
+            rm -rf node_modules
             npm install --ignore-scripts
             node-gyp rebuild -j 2
             mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
@@ -138,6 +140,7 @@ jobs:
               ABI=\$(node -p 'process.versions.modules')
               echo \"Building for Node \$NODE_VER (ABI \$ABI)...\"
               npm install -g node-gyp
+              rm -rf node_modules
               npm install --ignore-scripts
               cp prebuild/macOS/binding.gyp binding.gyp
               node-gyp rebuild -j 2
@@ -185,6 +188,7 @@ jobs:
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER (ABI $ABI)..."
             npm install -g node-gyp
+            rm -rf node_modules
             npm install --ignore-scripts
             cp prebuild/macOS/binding.gyp binding.gyp
             node-gyp rebuild -j 2
@@ -243,6 +247,7 @@ jobs:
             $ABI = & node -p "process.versions.modules"
             Write-Host "Building for Node $NODE_VER (v${nodeVer}, ABI $ABI)..."
             npm install -g node-gyp
+            if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }
             npm install --ignore-scripts
             node-gyp rebuild -j 2
             Move-Item -Force build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
