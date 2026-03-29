@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSIONS: '18 20 22 24'
+  NODE_VERSIONS: '18 20 22'
 
 jobs:
   validate:
@@ -239,7 +239,7 @@ jobs:
         shell: pwsh
         run: |
           msys2 -c "cp prebuild/Windows/binding.gyp binding.gyp"
-          foreach ($NODE_VER in @(18, 20, 22, 24)) {
+          foreach ($NODE_VER in @(18, 20, 22)) {
             Write-Host "=== Installing Node $NODE_VER ==="
             $shasums = Invoke-WebRequest -Uri "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" -UseBasicParsing
             $line = ($shasums.Content -split "`n" | Where-Object { $_ -match "win-x64\.zip" } | Select-Object -First 1)

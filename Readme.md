@@ -64,7 +64,7 @@ For v2: replace `@^3` with `@^2`.
 - macOS x64 (Intel, via Rosetta)
 - Windows x64
 
-Node.js 18, 20, 22, 24 with prebuilt binaries. On unsupported platforms or Node.js versions, the install script falls back to building from source via node-gyp.
+Node.js 18, 20, 22 with prebuilt binaries (v2). v3 supports all Node.js versions via N-API. On unsupported platforms or Node.js versions, the install script falls back to building from source via node-gyp.
 
 ### Compiling from source
 
