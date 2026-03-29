@@ -39,15 +39,18 @@ jobs:
       - name: Build all Node versions
         run: |
           set -ex
+          ORIG_PATH=$PATH
           cp prebuild/Linux/binding.gyp binding.gyp
           for NODE_VER in $NODE_VERSIONS; do
             echo "=== Installing Node $NODE_VER ==="
             curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
             NODE_FULL=$(grep 'linux-x64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-x64.tar.gz//' | sed 's/node-v//')
-            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /usr/local --strip-components=1
+            mkdir -p /opt/node-${NODE_VER}
+            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /opt/node-${NODE_VER} --strip-components=1
+            export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
-            rm -rf node_modules ~/.npm/_npx
+            rm -rf node_modules
             npm install --ignore-scripts
             npx --yes node-gyp rebuild -j 2
             mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
@@ -56,6 +59,7 @@ jobs:
       - name: Test binary
         run: |
           set -ex
+          export PATH=/opt/node-22/bin:$PATH
           cd /root/harfbuzz-* && make uninstall
           cd /root/cairo-* && make uninstall
           cd /root/pango-* && cd _build && ninja uninstall
@@ -65,7 +69,9 @@ jobs:
           cd $GITHUB_WORKSPACE
           node test/smoke.js
       - name: Package
-        run: node prebuild/package-platform.js linux-x64-gnu build/Release
+        run: |
+          export PATH=/opt/node-22/bin:$PATH
+          node prebuild/package-platform.js linux-x64-gnu build/Release
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-linux-x64-gnu
@@ -81,15 +87,18 @@ jobs:
       - name: Build all Node versions
         run: |
           set -ex
+          ORIG_PATH=$PATH
           cp prebuild/Linux/binding.gyp binding.gyp
           for NODE_VER in $NODE_VERSIONS; do
             echo "=== Installing Node $NODE_VER ==="
             curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
             NODE_FULL=$(grep 'linux-arm64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-arm64.tar.gz//' | sed 's/node-v//')
-            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /usr/local --strip-components=1
+            mkdir -p /opt/node-${NODE_VER}
+            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /opt/node-${NODE_VER} --strip-components=1
+            export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
-            rm -rf node_modules ~/.npm/_npx
+            rm -rf node_modules
             npm install --ignore-scripts
             npx --yes node-gyp rebuild -j 2
             mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
@@ -98,6 +107,7 @@ jobs:
       - name: Test binary
         run: |
           set -ex
+          export PATH=/opt/node-22/bin:$PATH
           cd /root/harfbuzz-* && make uninstall
           cd /root/cairo-* && make uninstall
           cd /root/pango-* && cd _build && ninja uninstall
@@ -107,7 +117,9 @@ jobs:
           cd $GITHUB_WORKSPACE
           node test/smoke.js
       - name: Package
-        run: node prebuild/package-platform.js linux-arm64-gnu build/Release
+        run: |
+          export PATH=/opt/node-22/bin:$PATH
+          node prebuild/package-platform.js linux-arm64-gnu build/Release
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-linux-arm64-gnu
