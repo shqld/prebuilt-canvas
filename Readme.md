@@ -1,78 +1,94 @@
-# node-canvas
+# prebuilt-canvas
 
-![Test](https://github.com/Automattic/node-canvas/workflows/Test/badge.svg)
-[![NPM version](https://badge.fury.io/js/canvas.svg)](http://badge.fury.io/js/canvas)
+[node-canvas](https://github.com/Automattic/node-canvas) with prebuilt binaries. No compiler or system dependencies required.
 
-node-canvas is a [Cairo](http://cairographics.org/)-backed Canvas implementation for [Node.js](http://nodejs.org).
+## Why use this instead of `canvas`?
+
+`canvas` (node-canvas) requires Cairo, Pango, and a C++ compiler to install. On many systems this means running `apt install`, `brew install`, or dealing with build failures in CI.
+
+`prebuilt-canvas` distributes prebuilt native binaries as platform-specific npm packages. `npm install` just works.
+
+- Same API, same code, 100% compatible
+- No C++ compiler, no Cairo, no Pango, no system dependencies
+- Prebuilt for Linux (x64, arm64), macOS (arm64, x64), Windows (x64)
+- Follows upstream releases
 
 ## Installation
 
 ```bash
-$ npm install canvas
+npm install prebuilt-canvas
 ```
 
-By default, pre-built binaries will be downloaded if you're on one of the following platforms:
-- macOS x86/64
-- macOS aarch64 (aka Apple silicon)
-- Linux x86/64 (glibc only)
-- Windows x86/64
+### Using as a drop-in replacement for `canvas`
 
-If you want to build from source, use `npm install --build-from-source` and see the **Compiling** section below.
+If your dependencies use `canvas` internally, use overrides to replace it:
 
-The minimum version of Node.js required is **18.12.0**.
+**npm** (package.json):
+```json
+{
+  "overrides": {
+    "canvas": "npm:prebuilt-canvas@^3"
+  }
+}
+```
 
-### Compiling
+**yarn** (package.json):
+```json
+{
+  "resolutions": {
+    "canvas": "npm:prebuilt-canvas@^3"
+  }
+}
+```
 
-If you don't have a supported OS or processor architecture, or you use `--build-from-source`, the module will be compiled on your system. This requires several dependencies, including Cairo and Pango.
+**pnpm** (package.json):
+```json
+{
+  "pnpm": {
+    "overrides": {
+      "canvas": "npm:prebuilt-canvas@^3"
+    }
+  }
+}
+```
 
-For detailed installation information, see the [wiki](https://github.com/Automattic/node-canvas/wiki/_pages). One-line installation instructions for common OSes are below. Note that libgif/giflib, librsvg and libjpeg are optional and only required if you need GIF, SVG and JPEG support, respectively. Cairo v1.10.0 or later is required.
+For v2: replace `@^3` with `@^2`.
+
+**Important**: Always specify a version range (`@^3`, `@^2`). Without it, npm uses the version your dependency requested (e.g. `canvas@2.11.0`), which may not exist as `prebuilt-canvas@2.11.0`.
+
+### Supported platforms
+
+- Linux x64 (glibc)
+- Linux arm64 (glibc)
+- macOS arm64 (Apple Silicon)
+- macOS x64 (Intel, via Rosetta)
+- Windows x64
+
+On unsupported platforms, the postinstall script falls back to building from source via node-gyp.
+
+### Compiling from source
+
+On unsupported platforms, the module will be compiled automatically. This requires Cairo, Pango, and other system dependencies.
 
 OS | Command
 ----- | -----
-macOS | Using [Homebrew](https://brew.sh/):<br/>`brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman python-setuptools`
+macOS | `brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman python-setuptools`
 Ubuntu | `sudo apt-get install build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev`
 Fedora | `sudo yum install gcc-c++ cairo-devel pango-devel libjpeg-turbo-devel giflib-devel`
-Solaris | `pkgin install cairo pango pkg-config xproto renderproto kbproto xextproto`
-OpenBSD | `doas pkg_add cairo pango png jpeg giflib`
-Windows | See the [wiki](https://github.com/Automattic/node-canvas/wiki/Installation:-Windows)
-Others | See the [wiki](https://github.com/Automattic/node-canvas/wiki)
-
-**Mac OS X v10.11+:** If you have recently updated to Mac OS X v10.11+ and are experiencing trouble when compiling, run the following command: `xcode-select --install`. Read more about the problem [on Stack Overflow](http://stackoverflow.com/a/32929012/148072).
-If you have xcode 10.0 or higher installed, in order to build from source you need NPM 6.4.1 or higher.
+Others | See the [node-canvas wiki](https://github.com/Automattic/node-canvas/wiki)
 
 ## Quick Example
 
 ```javascript
-const { createCanvas, loadImage } = require('canvas')
+const { createCanvas, loadImage } = require('prebuilt-canvas')
 const canvas = createCanvas(200, 200)
 const ctx = canvas.getContext('2d')
 
-// Write "Awesome!"
 ctx.font = '30px Impact'
-ctx.rotate(0.1)
-ctx.fillText('Awesome!', 50, 100)
+ctx.fillText('Hello!', 50, 100)
 
-// Draw line under text
-var text = ctx.measureText('Awesome!')
-ctx.strokeStyle = 'rgba(0,0,0,0.5)'
-ctx.beginPath()
-ctx.lineTo(50, 102)
-ctx.lineTo(50 + text.width, 102)
-ctx.stroke()
-
-// Draw cat with lime helmet
-loadImage('examples/images/lime-cat.jpg').then((image) => {
-  ctx.drawImage(image, 50, 0, 70, 70)
-
-  console.log('<img src="' + canvas.toDataURL() + '" />')
-})
+const buf = canvas.toBuffer('image/png')
 ```
-
-## Upgrading from 1.x to 2.x
-
-See the [changelog](https://github.com/Automattic/node-canvas/blob/master/CHANGELOG.md) for a guide to upgrading from 1.x to 2.x.
-
-For version 1.x documentation, see [the v1.x branch](https://github.com/Automattic/node-canvas/tree/v1.x).
 
 ## Documentation
 
@@ -111,7 +127,7 @@ This project is an implementation of the Web Canvas API and implements that API 
 Creates a Canvas instance. This method works in both Node.js and Web browsers, where there is no Canvas constructor. (See `browser.js` for the implementation that runs in browsers.)
 
 ```js
-const { createCanvas } = require('canvas')
+const { createCanvas } = require('prebuilt-canvas')
 const mycanvas = createCanvas(200, 200)
 const myPDFcanvas = createCanvas(600, 800, 'pdf') // see "PDF Support" section
 ```
@@ -128,7 +144,7 @@ const myPDFcanvas = createCanvas(600, 800, 'pdf') // see "PDF Support" section
 Creates an ImageData instance. This method works in both Node.js and Web browsers.
 
 ```js
-const { createImageData } = require('canvas')
+const { createImageData } = require('prebuilt-canvas')
 const width = 20, height = 20
 const arraySize = width * height * 4
 const mydata = createImageData(new Uint8ClampedArray(arraySize), width)
@@ -143,7 +159,7 @@ const mydata = createImageData(new Uint8ClampedArray(arraySize), width)
 Convenience method for loading images. This method works in both Node.js and Web browsers.
 
 ```js
-const { loadImage } = require('canvas')
+const { loadImage } = require('prebuilt-canvas')
 const myimg = loadImage('http://server.com/image.png')
 
 myimg.then(() => {
@@ -166,7 +182,7 @@ const myimg = await loadImage('http://server.com/image.png')
 To use a font file that is not installed as a system font, use `registerFont()` to register the font with Canvas.
 
 ```js
-const { registerFont, createCanvas } = require('canvas')
+const { registerFont, createCanvas } = require('prebuilt-canvas')
 registerFont('comicsans.ttf', { family: 'Comic Sans' })
 
 const canvas = createCanvas(500, 500)
@@ -187,7 +203,7 @@ The second argument is an object with properties that resemble the CSS propertie
 Use `deregisterAllFonts` to unregister all fonts that have been previously registered. This method is useful when you want to remove all registered fonts, such as when using the canvas in tests
 
 ```ts
-const { registerFont, createCanvas, deregisterAllFonts } = require('canvas')
+const { registerFont, createCanvas, deregisterAllFonts } = require('prebuilt-canvas')
 
 describe('text rendering', () => {
     afterEach(() => {
@@ -216,7 +232,7 @@ describe('text rendering', () => {
 As in browsers, `img.src` can be set to a `data:` URI or a remote URL. In addition, node-canvas allows setting `src` to a local file path or `Buffer` instance.
 
 ```javascript
-const { Image } = require('canvas')
+const { Image } = require('prebuilt-canvas')
 
 // From a buffer:
 fs.readFile('images/squid.png', (err, squid) => {
@@ -255,7 +271,7 @@ Applies to JPEG images drawn to PDF canvases only.
 Setting `img.dataMode = Image.MODE_MIME` or `Image.MODE_MIME|Image.MODE_IMAGE` enables MIME data tracking of images. When MIME data is tracked, PDF canvases can embed JPEGs directly into the output, rather than re-encoding into PNG. This can drastically reduce filesize and speed up rendering.
 
 ```javascript
-const { Image, createCanvas } = require('canvas')
+const { Image, createCanvas } = require('prebuilt-canvas')
 const canvas = createCanvas(w, h, 'pdf')
 const img = new Image()
 img.dataMode = Image.MODE_IMAGE // Only image data tracked
@@ -600,15 +616,11 @@ Notes and caveats:
 
 ## Testing
 
-First make sure you've built the latest version. Get all the deps you need (see [compiling](#compiling) above), and run:
-
-```
-npm install --build-from-source
-```
+For unit tests: `npm run test`.
 
 For visual tests: `npm run test-server` and point your browser to http://localhost:4000.
 
-For unit tests: `npm run test`.
+For smoke testing prebuilt binaries: `node test/smoke.js`.
 
 ## Benchmarks
 
