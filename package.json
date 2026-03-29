@@ -1,5 +1,5 @@
 {
-  "name": "canvas",
+  "name": "prebuilt-canvas",
   "description": "Canvas graphics API backed by Cairo",
   "version": "2.11.2",
   "author": "TJ Holowaychuk <tj@learnboost.com>",
@@ -31,28 +31,27 @@
     "test-server": "node test/server.js",
     "generate-wpt": "node ./test/wpt/generate.js",
     "test-wpt": "mocha test/wpt/generated/*.js",
-    "install": "node-pre-gyp install --fallback-to-build --update-binary",
-    "dtslint": "dtslint types"
-  },
-  "binary": {
-    "module_name": "canvas",
-    "module_path": "build/Release",
-    "host": "https://github.com/Automattic/node-canvas/releases/download/",
-    "remote_path": "v{version}",
-    "package_name": "{module_name}-v{version}-{node_abi}-{platform}-{libc}-{arch}.tar.gz"
+    "dtslint": "dtslint types",
+    "postinstall": "node scripts/install.js"
   },
   "files": [
     "binding.gyp",
     "lib/",
+    "scripts/",
     "src/",
     "util/",
     "types/index.d.ts"
   ],
   "types": "types/index.d.ts",
   "dependencies": {
-    "@mapbox/node-pre-gyp": "^1.0.0",
-    "nan": "^2.17.0",
-    "simple-get": "^3.0.3"
+    "nan": "^2.17.0"
+  },
+  "optionalDependencies": {
+    "@prebuilt-canvas/darwin-arm64": "2.11.2",
+    "@prebuilt-canvas/darwin-x64": "2.11.2",
+    "@prebuilt-canvas/linux-arm64-gnu": "2.11.2",
+    "@prebuilt-canvas/linux-x64-gnu": "2.11.2",
+    "@prebuilt-canvas/win32-x64": "2.11.2"
   },
   "devDependencies": {
     "@types/node": "^10.12.18",
