@@ -43,7 +43,7 @@ jobs:
           for NODE_VER in $NODE_VERSIONS; do
             echo "=== Installing Node $NODE_VER ==="
             curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
-            NODE_FULL=$(grep 'linux-x64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-x64.tar.gz//' | sed 's/node-//')
+            NODE_FULL=$(grep 'linux-x64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-x64.tar.gz//' | sed 's/node-v//')
             curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /usr/local --strip-components=1
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
@@ -85,7 +85,7 @@ jobs:
           for NODE_VER in $NODE_VERSIONS; do
             echo "=== Installing Node $NODE_VER ==="
             curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
-            NODE_FULL=$(grep 'linux-arm64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-arm64.tar.gz//' | sed 's/node-//')
+            NODE_FULL=$(grep 'linux-arm64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-arm64.tar.gz//' | sed 's/node-v//')
             curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /usr/local --strip-components=1
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
