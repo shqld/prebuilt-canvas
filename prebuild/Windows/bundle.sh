@@ -6,10 +6,13 @@ rm -f build/Release/canvas.ipdb
 rm -f build/Release/canvas.lib
 rm -f build/Release/canvas.pdb
 
-# Copy DLLs from all installed ucrt64 packages (includes transitive deps
-# that pacman resolved during preinstall.sh).
+# Copy DLLs from installed ucrt64 packages, excluding build-only tools.
+# binutils and tools are only needed for gendef/dlltool during preinstall.
+EXCLUDE="mingw-w64-ucrt-x86_64-binutils|mingw-w64-ucrt-x86_64-tools"
+
 pacman -Qq 2>/dev/null \
   | grep 'ucrt-x86_64' \
+  | grep -Ev "$EXCLUDE" \
   | xargs pacman -Qlq 2>/dev/null \
   | grep '/ucrt64/bin/.*\.dll$' \
   | sort -u \
