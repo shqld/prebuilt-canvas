@@ -73,6 +73,22 @@ async function main () {
   assert(svg.toString().includes('<svg'), 'SVG output missing <svg> tag')
   console.log('SVG output: OK (%d bytes)', svg.length)
 
+  // 8. registerFont (Pango + Fontconfig)
+  const fontPath = path.join(__dirname, '..', 'examples', 'pfennigFont', 'Pfennig.ttf')
+  try {
+    canvas.registerFont(fontPath, { family: 'Pfennig' })
+    const fontCanvas = canvas.createCanvas(200, 50)
+    const fontCtx = fontCanvas.getContext('2d')
+    fontCtx.font = '20px Pfennig'
+    fontCtx.fillText('registerFont works', 10, 30)
+    const fontMetrics = fontCtx.measureText('registerFont works')
+    assert(fontMetrics.width > 0, 'registerFont measureText returned zero width')
+    console.log('registerFont: OK (width=%d)', fontMetrics.width)
+  } catch (err) {
+    console.log('registerFont: FAILED -', err.message)
+    throw err
+  }
+
   console.log('\nAll smoke tests passed.')
 }
 
