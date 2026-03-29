@@ -1,0 +1,71 @@
+name: Sync Upstream
+on:
+  schedule:
+    - cron: '0 9 * * *' # JST 18:00
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/Automattic/node-canvas.git
+          git fetch upstream v2.x --tags
+
+      - name: Merge upstream
+        run: |
+          git merge upstream/v2.x --no-edit
+
+      - name: Check for new release
+        id: release
+        run: |
+          LATEST_TAG=$(git tag -l 'v2.*' --sort=-v:refname | grep -E '^v2\.[0-9]+\.[0-9]+$' | head -1)
+          echo "latest_tag=$LATEST_TAG"
+
+          CURRENT="v$(node -p "require('./package.json').version")"
+          echo "current=$CURRENT"
+
+          if [ "$LATEST_TAG" != "$CURRENT" ]; then
+            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "version=${LATEST_TAG#v}" >> $GITHUB_OUTPUT
+            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+            echo "New release detected: $CURRENT -> $LATEST_TAG"
+          else
+            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "No new release"
+          fi
+
+      - name: Update version and optionalDependencies
+        if: steps.release.outputs.new_release == 'true'
+        run: |
+          VERSION=${{ steps.release.outputs.version }}
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${VERSION}';
+            for (const dep of Object.keys(pkg.optionalDependencies || {})) {
+              pkg.optionalDependencies[dep] = '${VERSION}';
+            }
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          git add package.json
+          git commit -m "v${VERSION}"
+          git tag "v${VERSION}" -f
+
+      - name: Push
+        run: |
+          git push origin v2.x
+          if [ "${{ steps.release.outputs.new_release }}" = "true" ]; then
+            git push origin "v${{ steps.release.outputs.version }}" --force
+          fi
