@@ -1,7 +1,7 @@
 {
   "name": "prebuilt-canvas",
   "description": "Canvas graphics API backed by Cairo",
-  "version": "3.2.2",
+  "version": "3.2.2-rc.1",
   "author": "TJ Holowaychuk <tj@learnboost.com>",
   "main": "index.js",
   "browser": "browser.js",
@@ -33,7 +33,7 @@
     "generate-wpt": "node ./test/wpt/generate.js",
     "test-wpt": "mocha test/wpt/generated/*.js",
     "tsd": "tsd",
-    "postinstall": "node scripts/install.js"
+    "install": "node scripts/install.js"
   },
   "files": [
     "binding.gyp",
@@ -47,11 +47,11 @@
   ],
   "dependencies": {},
   "optionalDependencies": {
-    "@prebuilt-canvas/darwin-arm64": "3.2.2",
-    "@prebuilt-canvas/darwin-x64": "3.2.2",
-    "@prebuilt-canvas/linux-arm64-gnu": "3.2.2",
-    "@prebuilt-canvas/linux-x64-gnu": "3.2.2",
-    "@prebuilt-canvas/win32-x64": "3.2.2"
+    "@prebuilt-canvas/darwin-arm64": "3.2.2-rc.1",
+    "@prebuilt-canvas/darwin-x64": "3.2.2-rc.1",
+    "@prebuilt-canvas/linux-arm64-gnu": "3.2.2-rc.1",
+    "@prebuilt-canvas/linux-x64-gnu": "3.2.2-rc.1",
+    "@prebuilt-canvas/win32-x64": "3.2.2-rc.1"
   },
   "devDependencies": {
     "node-addon-api": "^7.0.0",
