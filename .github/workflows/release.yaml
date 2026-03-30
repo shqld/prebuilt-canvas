@@ -58,10 +58,14 @@ jobs:
           done
           cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
           . prebuild/Linux/bundle.sh
-      - name: Test binary
+      - name: Test binary (all Node versions)
         run: |
-          export PATH=/opt/node-22/bin:$PATH
-          node test/smoke.js
+          set -ex
+          for NODE_VER in $NODE_VERSIONS; do
+            export PATH=/opt/node-${NODE_VER}/bin:$PATH
+            echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+            node test/smoke.js
+          done
       - name: Package
         run: |
           export PATH=/opt/node-22/bin:$PATH
@@ -100,10 +104,14 @@ jobs:
           done
           cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
           . prebuild/Linux/bundle.sh
-      - name: Test binary
+      - name: Test binary (all Node versions)
         run: |
-          export PATH=/opt/node-22/bin:$PATH
-          node test/smoke.js
+          set -ex
+          for NODE_VER in $NODE_VERSIONS; do
+            export PATH=/opt/node-${NODE_VER}/bin:$PATH
+            echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+            node test/smoke.js
+          done
       - name: Package
         run: |
           export PATH=/opt/node-22/bin:$PATH
@@ -155,13 +163,18 @@ jobs:
           for file in build/Release/*; do
             codesign --deep --force --sign - "$file"
           done
-      - name: Test binary
+      - name: Test binary (all Node versions)
         run: |
           arch -x86_64 /bin/bash -c "
+            set -ex
             export PATH=/usr/local/bin:\$PATH
-            source ~/.nvm/nvm.sh && nvm use 22
+            source ~/.nvm/nvm.sh
             brew uninstall --force --ignore-dependencies cairo pango librsvg giflib harfbuzz 2>/dev/null || true
-            node test/smoke.js
+            for NODE_VER in $NODE_VERSIONS; do
+              nvm use \$NODE_VER
+              echo \"=== Testing with Node \$(node --version) (ABI \$(node -p process.versions.modules)) ===\"
+              node test/smoke.js
+            done
           "
       - name: Package
         run: node prebuild/package-platform.js darwin-x64 build/Release
@@ -200,11 +213,16 @@ jobs:
           for file in build/Release/*; do
             codesign --deep --force --sign - "$file"
           done
-      - name: Test binary
+      - name: Test binary (all Node versions)
         run: |
+          set -ex
           brew uninstall --force --ignore-dependencies cairo pango librsvg giflib harfbuzz
-          source ~/.nvm/nvm.sh && nvm use 22
-          node test/smoke.js
+          source ~/.nvm/nvm.sh
+          for NODE_VER in $NODE_VERSIONS; do
+            nvm use $NODE_VER
+            echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+            node test/smoke.js
+          done
       - name: Package
         run: |
           source ~/.nvm/nvm.sh && nvm use 22
@@ -257,10 +275,23 @@ jobs:
       - name: Bundle
         shell: msys2 {0}
         run: . prebuild/Windows/bundle.sh
-      - name: Test binary
-        run: node test/smoke.js
+      - name: Test binary (all Node versions)
+        shell: pwsh
+        run: |
+          foreach ($NODE_VER in @(18, 20, 22, 24)) {
+            $nodeDir = (Get-ChildItem "$env:TEMP\node-${NODE_VER}" | Select-Object -First 1).FullName
+            $env:PATH = "${nodeDir};$env:PATH"
+            $ver = & node --version
+            $abi = & node -p "process.versions.modules"
+            Write-Host "=== Testing with Node $ver (ABI $abi) ==="
+            & node test/smoke.js
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
       - name: Package
-        run: node prebuild/package-platform.js win32-x64 build/Release
+        run: |
+          $nodeDir = (Get-ChildItem "$env:TEMP\node-22" | Select-Object -First 1).FullName
+          $env:PATH = "${nodeDir};$env:PATH"
+          node prebuild/package-platform.js win32-x64 build/Release
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-win32-x64
@@ -348,17 +379,33 @@ jobs:
             os: windows-2025
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/setup-node@v4
-        if: ${{ !matrix.rosetta }}
-        with:
-          node-version: 22
+      - name: Setup Node.js versions (Unix)
+        if: ${{ !matrix.rosetta && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+          source ~/.nvm/nvm.sh
+          for v in 18 20 22 24; do nvm install $v; done
 
-      - name: Setup Rosetta + x64 Node.js
+      - name: Setup Node.js versions (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          foreach ($v in @(18, 20, 22, 24)) {
+            $shasums = Invoke-WebRequest -Uri "https://nodejs.org/dist/latest-v${v}.x/SHASUMS256.txt" -UseBasicParsing
+            $line = ($shasums.Content -split "`n" | Where-Object { $_ -match "win-x64\.zip" } | Select-Object -First 1)
+            $filename = ($line -split "\s+")[1]
+            $nodeVer = ($filename -replace "node-v" -replace "-win-x64\.zip")
+            Invoke-WebRequest -Uri "https://nodejs.org/dist/v${nodeVer}/node-v${nodeVer}-win-x64.zip" -OutFile "$env:TEMP\node-${v}.zip"
+            Expand-Archive -Force "$env:TEMP\node-${v}.zip" -DestinationPath "$env:TEMP\node-${v}"
+          }
+
+      - name: Setup Rosetta + x64 Node.js versions
         if: ${{ matrix.rosetta }}
         run: |
           softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
           arch -x86_64 /bin/bash -c "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
-          arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && nvm install 22"
+          arch -x86_64 /bin/bash -c "source ~/.nvm/nvm.sh && for v in 18 20 22 24; do nvm install \$v; done"
 
       - name: Wait for platform package on this CDN edge
         if: ${{ !matrix.rosetta }}
@@ -382,24 +429,58 @@ jobs:
             elapsed=$((elapsed + INTERVAL))
           done
 
-      - name: Install and verify
-        if: ${{ !matrix.rosetta }}
+      - name: Install and verify (Unix, all Node versions)
+        if: ${{ !matrix.rosetta && runner.os != 'Windows' }}
         shell: bash
         run: |
           set -ex
+          source ~/.nvm/nvm.sh
           npm cache clean --force
           mkdir test-install && cd test-install
           npm init -y
+          nvm use 22
           npm install prebuilt-canvas@${GITHUB_REF_NAME#v}
-          node -e "
-            const assert = require('assert');
-            const c = require('prebuilt-canvas');
-            assert(c.cairoVersion, 'cairoVersion missing');
-            const cv = c.createCanvas(100, 100);
-            cv.getContext('2d').fillRect(0, 0, 100, 100);
-            assert(cv.toBuffer('image/png').length > 100, 'PNG too small');
-            console.log('OK: ' + process.platform + '-' + process.arch + ' cairo=' + c.cairoVersion);
-          "
+          cat > verify.js << 'SCRIPT'
+          const assert = require('assert');
+          const c = require('prebuilt-canvas');
+          assert(c.cairoVersion, 'cairoVersion missing');
+          const cv = c.createCanvas(100, 100);
+          cv.getContext('2d').fillRect(0, 0, 100, 100);
+          assert(cv.toBuffer('image/png').length > 100, 'PNG too small');
+          console.log('OK: ' + process.platform + '-' + process.arch + ' Node ' + process.version + ' cairo=' + c.cairoVersion);
+          SCRIPT
+          for NODE_VER in 18 20 22 24; do
+            nvm use $NODE_VER
+            echo "=== Verify with Node $(node --version) ==="
+            node verify.js
+          done
+
+      - name: Install and verify (Windows, all Node versions)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          npm cache clean --force
+          mkdir test-install; cd test-install
+          npm init -y
+          $nodeDir = (Get-ChildItem "$env:TEMP\node-22" | Select-Object -First 1).FullName
+          $env:PATH = "${nodeDir};$env:PATH"
+          npm install prebuilt-canvas@$($env:GITHUB_REF_NAME -replace '^v','')
+          @"
+          const assert = require('assert');
+          const c = require('prebuilt-canvas');
+          assert(c.cairoVersion, 'cairoVersion missing');
+          const cv = c.createCanvas(100, 100);
+          cv.getContext('2d').fillRect(0, 0, 100, 100);
+          assert(cv.toBuffer('image/png').length > 100, 'PNG too small');
+          console.log('OK: ' + process.platform + '-' + process.arch + ' Node ' + process.version + ' cairo=' + c.cairoVersion);
+          "@ | Set-Content verify.js
+          foreach ($v in @(18, 20, 22, 24)) {
+            $nodeDir = (Get-ChildItem "$env:TEMP\node-${v}" | Select-Object -First 1).FullName
+            $env:PATH = "${nodeDir};$env:PATH"
+            Write-Host "=== Verify with Node $(& node --version) ==="
+            & node verify.js
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
 
       - name: Wait for platform package on this CDN edge (Rosetta)
         if: ${{ matrix.rosetta }}
@@ -422,24 +503,31 @@ jobs:
             elapsed=$((elapsed + INTERVAL))
           done
 
-      - name: Install and verify (Rosetta)
+      - name: Install and verify (Rosetta, all Node versions)
         if: ${{ matrix.rosetta }}
         run: |
+          mkdir -p test-install
+          cat > test-install/verify.js << 'SCRIPT'
+          const assert = require("assert");
+          const c = require("prebuilt-canvas");
+          assert(c.cairoVersion, "cairoVersion missing");
+          const cv = c.createCanvas(100, 100);
+          cv.getContext("2d").fillRect(0, 0, 100, 100);
+          assert(cv.toBuffer("image/png").length > 100, "PNG too small");
+          console.log("OK: " + process.platform + "-" + process.arch + " Node " + process.version + " cairo=" + c.cairoVersion);
+          SCRIPT
           arch -x86_64 /bin/bash -c "
             set -ex
-            source ~/.nvm/nvm.sh && nvm use 22
-            mkdir test-install && cd test-install
+            source ~/.nvm/nvm.sh
+            nvm use 22
+            cd test-install
             npm init -y
             npm install prebuilt-canvas@${GITHUB_REF_NAME#v}
-            node -e \"
-              const assert = require('assert');
-              const c = require('prebuilt-canvas');
-              assert(c.cairoVersion, 'cairoVersion missing');
-              const cv = c.createCanvas(100, 100);
-              cv.getContext('2d').fillRect(0, 0, 100, 100);
-              assert(cv.toBuffer('image/png').length > 100, 'PNG too small');
-              console.log('OK: ' + process.platform + '-' + process.arch + ' cairo=' + c.cairoVersion);
-            \"
+            for NODE_VER in 18 20 22 24; do
+              nvm use \$NODE_VER
+              echo \"=== Verify with Node \$(node --version) ===\"
+              node verify.js
+            done
           "
 
       - name: Test package managers (Linux only)
