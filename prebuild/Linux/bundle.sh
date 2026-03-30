@@ -8,8 +8,8 @@ apt install -y patchelf pax-utils
 FIRST_NODE=$(ls build/Release/canvas-node-v*.node 2>/dev/null | head -1)
 [ -z "$FIRST_NODE" ] && FIRST_NODE="build/Release/canvas.node"
 
-# Get ALL shared library dependencies except core system libs (libc, libm, libdl, librt, libpthread, ld-linux)
-copies=$(lddtree -l "$FIRST_NODE" | sed -r -e '/\.node$/d' -e '/ld-linux/d' -e '/libc\.so/d' -e '/libm\.so/d' -e '/libdl\.so/d' -e '/librt\.so/d' -e '/libpthread\.so/d' -e '/libstdc\+\+/d' -e '/libgcc_s/d')
+# Filter out system libs. Debian 10 image puts source-built libs in /usr/local/lib.
+copies=$(lddtree -l "$FIRST_NODE" | sed -r -e '/^\/lib/d' -e '/\.node$/d')
 
 # remove build artifacts
 rm -rf build/Release/.deps

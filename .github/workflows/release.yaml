@@ -32,44 +32,80 @@ jobs:
   build-linux-x64:
     name: Linux x64
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/shqld/prebuilt-canvas/builder:bookworm-x64
     steps:
       - uses: actions/checkout@v4
-      - name: Build all Node versions
+      - name: Build Node 18-22 (Debian 10 image for glibc compat)
         run: |
-          set -ex
-          ORIG_PATH=$PATH
-          mkdir -p /tmp/prebuilt-nodes
-          cp prebuild/Linux/binding.gyp binding.gyp
-          for NODE_VER in $NODE_VERSIONS; do
-            echo "=== Installing Node $NODE_VER ==="
-            curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
-            NODE_FULL=$(grep 'linux-x64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-x64.tar.gz//' | sed 's/node-v//')
-            mkdir -p /opt/node-${NODE_VER}
-            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /opt/node-${NODE_VER} --strip-components=1
-            export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
-            ABI=$(node -p "process.versions.modules")
-            echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
-            rm -rf node_modules
-            npm install --ignore-scripts
-            npx --yes node-gyp rebuild -j 2
-            cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
-          done
-          cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
-          . prebuild/Linux/bundle.sh
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            -e NODE_VERSIONS="18 20 22" \
+            zbbjornson/canvas-prebuilt:11 bash -c '
+              set -ex
+              ORIG_PATH=$PATH
+              mkdir -p /tmp/prebuilt-nodes
+              cp prebuild/Linux/binding.gyp binding.gyp
+              for NODE_VER in $NODE_VERSIONS; do
+                echo "=== Installing Node $NODE_VER ==="
+                curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
+                NODE_FULL=$(grep "linux-x64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-x64.tar.gz//" | sed "s/node-v//")
+                mkdir -p /opt/node-${NODE_VER}
+                curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /opt/node-${NODE_VER} --strip-components=1
+                export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
+                ABI=$(node -p "process.versions.modules")
+                echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
+                rm -rf node_modules
+                npm install --ignore-scripts
+                npx --yes node-gyp rebuild -j 2
+                cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
+              done
+              cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
+              . prebuild/Linux/bundle.sh
+            '
+      - name: Build Node 24 (bookworm image for C++20/gcc 12)
+        run: |
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            ghcr.io/shqld/prebuilt-canvas/builder:bookworm-x64 bash -c '
+              set -ex
+              curl -fsSL "https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt" > /tmp/shasums.txt
+              NODE_FULL=$(grep "linux-x64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-x64.tar.gz//" | sed "s/node-v//")
+              mkdir -p /opt/node-24
+              curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /opt/node-24 --strip-components=1
+              export PATH=/opt/node-24/bin:$PATH
+              ABI=$(node -p "process.versions.modules")
+              echo "Building for Node 24 ($NODE_FULL, ABI $ABI)..."
+              cp prebuild/Linux/binding.gyp binding.gyp
+              rm -rf node_modules
+              npm install --ignore-scripts
+              npx --yes node-gyp rebuild -j 2
+              cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+            '
       - name: Test binary (all Node versions)
         run: |
-          set -ex
-          for NODE_VER in $NODE_VERSIONS; do
-            export PATH=/opt/node-${NODE_VER}/bin:$PATH
-            echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-            node test/smoke.js
-          done
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            zbbjornson/canvas-prebuilt:11 bash -c '
+              set -ex
+              for NODE_VER in 18 20 22; do
+                export PATH=/opt/node-${NODE_VER}/bin:$PATH
+                echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+                node test/smoke.js
+              done
+            '
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            ghcr.io/shqld/prebuilt-canvas/builder:bookworm-x64 bash -c '
+              mkdir -p /opt/node-24
+              curl -fsSL "https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt" > /tmp/shasums.txt
+              NODE_FULL=$(grep "linux-x64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-x64.tar.gz//" | sed "s/node-v//")
+              curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /opt/node-24 --strip-components=1
+              export PATH=/opt/node-24/bin:$PATH
+              echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+              node test/smoke.js
+            '
       - name: Package
         run: |
-          export PATH=/opt/node-22/bin:$PATH
-          node prebuild/package-platform.js linux-x64-gnu build/Release
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            zbbjornson/canvas-prebuilt:11 bash -c '
+              export PATH=/opt/node-22/bin:$PATH
+              node prebuild/package-platform.js linux-x64-gnu build/Release
+            '
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-linux-x64-gnu
@@ -78,44 +114,80 @@ jobs:
   build-linux-arm64:
     name: Linux arm64
     runs-on: ubuntu-24.04-arm
-    container:
-      image: ghcr.io/shqld/prebuilt-canvas/builder:bookworm-arm64
     steps:
       - uses: actions/checkout@v4
-      - name: Build all Node versions
+      - name: Build Node 18-22 (Debian 10 image for glibc compat)
         run: |
-          set -ex
-          ORIG_PATH=$PATH
-          mkdir -p /tmp/prebuilt-nodes
-          cp prebuild/Linux/binding.gyp binding.gyp
-          for NODE_VER in $NODE_VERSIONS; do
-            echo "=== Installing Node $NODE_VER ==="
-            curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
-            NODE_FULL=$(grep 'linux-arm64.tar.gz' /tmp/shasums.txt | head -1 | awk '{print $2}' | sed 's/-linux-arm64.tar.gz//' | sed 's/node-v//')
-            mkdir -p /opt/node-${NODE_VER}
-            curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /opt/node-${NODE_VER} --strip-components=1
-            export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
-            ABI=$(node -p "process.versions.modules")
-            echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
-            rm -rf node_modules
-            npm install --ignore-scripts
-            npx --yes node-gyp rebuild -j 2
-            cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
-          done
-          cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
-          . prebuild/Linux/bundle.sh
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            -e NODE_VERSIONS="18 20 22" \
+            chearon/canvas-prebuilt-arm:1 bash -c '
+              set -ex
+              ORIG_PATH=$PATH
+              mkdir -p /tmp/prebuilt-nodes
+              cp prebuild/Linux/binding.gyp binding.gyp
+              for NODE_VER in $NODE_VERSIONS; do
+                echo "=== Installing Node $NODE_VER ==="
+                curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" > /tmp/shasums.txt
+                NODE_FULL=$(grep "linux-arm64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-arm64.tar.gz//" | sed "s/node-v//")
+                mkdir -p /opt/node-${NODE_VER}
+                curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /opt/node-${NODE_VER} --strip-components=1
+                export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
+                ABI=$(node -p "process.versions.modules")
+                echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
+                rm -rf node_modules
+                npm install --ignore-scripts
+                npx --yes node-gyp rebuild -j 2
+                cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
+              done
+              cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
+              . prebuild/Linux/bundle.sh
+            '
+      - name: Build Node 24 (bookworm image for C++20/gcc 12)
+        run: |
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            ghcr.io/shqld/prebuilt-canvas/builder:bookworm-arm64 bash -c '
+              set -ex
+              curl -fsSL "https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt" > /tmp/shasums.txt
+              NODE_FULL=$(grep "linux-arm64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-arm64.tar.gz//" | sed "s/node-v//")
+              mkdir -p /opt/node-24
+              curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /opt/node-24 --strip-components=1
+              export PATH=/opt/node-24/bin:$PATH
+              ABI=$(node -p "process.versions.modules")
+              echo "Building for Node 24 ($NODE_FULL, ABI $ABI)..."
+              cp prebuild/Linux/binding.gyp binding.gyp
+              rm -rf node_modules
+              npm install --ignore-scripts
+              npx --yes node-gyp rebuild -j 2
+              cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+            '
       - name: Test binary (all Node versions)
         run: |
-          set -ex
-          for NODE_VER in $NODE_VERSIONS; do
-            export PATH=/opt/node-${NODE_VER}/bin:$PATH
-            echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-            node test/smoke.js
-          done
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            chearon/canvas-prebuilt-arm:1 bash -c '
+              set -ex
+              for NODE_VER in 18 20 22; do
+                export PATH=/opt/node-${NODE_VER}/bin:$PATH
+                echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+                node test/smoke.js
+              done
+            '
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            ghcr.io/shqld/prebuilt-canvas/builder:bookworm-arm64 bash -c '
+              mkdir -p /opt/node-24
+              curl -fsSL "https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt" > /tmp/shasums.txt
+              NODE_FULL=$(grep "linux-arm64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-arm64.tar.gz//" | sed "s/node-v//")
+              curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /opt/node-24 --strip-components=1
+              export PATH=/opt/node-24/bin:$PATH
+              echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+              node test/smoke.js
+            '
       - name: Package
         run: |
-          export PATH=/opt/node-22/bin:$PATH
-          node prebuild/package-platform.js linux-arm64-gnu build/Release
+          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
+            chearon/canvas-prebuilt-arm:1 bash -c '
+              export PATH=/opt/node-22/bin:$PATH
+              node prebuild/package-platform.js linux-arm64-gnu build/Release
+            '
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-linux-arm64-gnu
