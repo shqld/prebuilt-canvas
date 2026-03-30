@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSIONS: '18 20 22'
+  NODE_VERSIONS: '18 20 22 24'
 
 jobs:
   validate:
@@ -33,7 +33,7 @@ jobs:
     name: Linux x64
     runs-on: ubuntu-24.04
     container:
-      image: zbbjornson/canvas-prebuilt:11
+      image: ghcr.io/shqld/prebuilt-canvas/builder:bookworm-x64
     steps:
       - uses: actions/checkout@v4
       - name: Build all Node versions
@@ -58,15 +58,7 @@ jobs:
           . prebuild/Linux/bundle.sh
       - name: Test binary
         run: |
-          set -ex
           export PATH=/opt/node-22/bin:$PATH
-          cd /root/harfbuzz-* && make uninstall
-          cd /root/cairo-* && make uninstall
-          cd /root/pango-* && cd _build && ninja uninstall
-          cd /root/libpng-* && make uninstall
-          cd /root/libjpeg-* && cd b && make uninstall
-          cd /root/giflib-* && make uninstall
-          cd $GITHUB_WORKSPACE
           node test/smoke.js
       - name: Package
         run: |
@@ -81,7 +73,7 @@ jobs:
     name: Linux arm64
     runs-on: ubuntu-24.04-arm
     container:
-      image: chearon/canvas-prebuilt-arm:1
+      image: ghcr.io/shqld/prebuilt-canvas/builder:bookworm-arm64
     steps:
       - uses: actions/checkout@v4
       - name: Build all Node versions
@@ -106,15 +98,7 @@ jobs:
           . prebuild/Linux/bundle.sh
       - name: Test binary
         run: |
-          set -ex
           export PATH=/opt/node-22/bin:$PATH
-          cd /root/harfbuzz-* && make uninstall
-          cd /root/cairo-* && make uninstall
-          cd /root/pango-* && cd _build && ninja uninstall
-          cd /root/libpng-* && make uninstall
-          cd /root/libjpeg-* && cd b && make uninstall
-          cd /root/giflib-* && make uninstall
-          cd $GITHUB_WORKSPACE
           node test/smoke.js
       - name: Package
         run: |
@@ -239,7 +223,7 @@ jobs:
         shell: pwsh
         run: |
           msys2 -c "cp prebuild/Windows/binding.gyp binding.gyp"
-          foreach ($NODE_VER in @(18, 20, 22)) {
+          foreach ($NODE_VER in @(18, 20, 22, 24)) {
             Write-Host "=== Installing Node $NODE_VER ==="
             $shasums = Invoke-WebRequest -Uri "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" -UseBasicParsing
             $line = ($shasums.Content -split "`n" | Where-Object { $_ -match "win-x64\.zip" } | Select-Object -First 1)
