@@ -63,7 +63,7 @@ jobs:
               for NODE_VER in $NODE_VERSIONS; do
                 export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
                 echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-                node test/smoke.js
+                DEBUG_CANVAS=1 node test/smoke.js
               done
               # Package
               export PATH=/opt/node-22/bin:$ORIG_PATH
@@ -132,7 +132,7 @@ jobs:
               for NODE_VER in $NODE_VERSIONS; do
                 export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
                 echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-                node test/smoke.js
+                DEBUG_CANVAS=1 node test/smoke.js
               done
               # Package
               export PATH=/opt/node-22/bin:$ORIG_PATH
