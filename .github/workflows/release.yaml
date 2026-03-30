@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build Node 18-22 (Debian 10 image for glibc compat)
+      - name: Build and test Node 18-22, package (Debian 10)
         run: |
           docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
             -e NODE_VERSIONS="18 20 22" \
@@ -59,9 +59,20 @@ jobs:
               done
               cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
               . prebuild/Linux/bundle.sh
+              # Test each version
+              for NODE_VER in $NODE_VERSIONS; do
+                export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
+                echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+                node test/smoke.js
+              done
+              # Package
+              export PATH=/opt/node-22/bin:$ORIG_PATH
+              node prebuild/package-platform.js linux-x64-gnu build/Release
             '
-      - name: Build Node 24 (bookworm image for C++20/gcc 12)
+      - name: Build and test Node 24 (bookworm)
         run: |
+          # Save Node 18-22 artifacts before node-gyp rebuild destroys them
+          cp -r build/Release /tmp/prebuilt-release
           docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
             ghcr.io/shqld/prebuilt-canvas/builder:bookworm-x64 bash -c '
               set -ex
@@ -78,34 +89,10 @@ jobs:
               npx --yes node-gyp rebuild -j 2
               cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
             '
-      - name: Test binary (all Node versions)
-        run: |
-          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
-            zbbjornson/canvas-prebuilt:11 bash -c '
-              set -ex
-              for NODE_VER in 18 20 22; do
-                export PATH=/opt/node-${NODE_VER}/bin:$PATH
-                echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-                node test/smoke.js
-              done
-            '
-          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
-            ghcr.io/shqld/prebuilt-canvas/builder:bookworm-x64 bash -c '
-              mkdir -p /opt/node-24
-              curl -fsSL "https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt" > /tmp/shasums.txt
-              NODE_FULL=$(grep "linux-x64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-x64.tar.gz//" | sed "s/node-v//")
-              curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-x64.tar.gz" | tar -xz -C /opt/node-24 --strip-components=1
-              export PATH=/opt/node-24/bin:$PATH
-              echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-              node test/smoke.js
-            '
-      - name: Package
-        run: |
-          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
-            zbbjornson/canvas-prebuilt:11 bash -c '
-              export PATH=/opt/node-22/bin:$PATH
-              node prebuild/package-platform.js linux-x64-gnu build/Release
-            '
+          # Restore Node 18-22 artifacts
+          cp /tmp/prebuilt-release/canvas-node-v*.node build/Release/
+          cp /tmp/prebuilt-release/*.so* build/Release/
+          cp /tmp/prebuilt-release/package.json build/Release/ 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-linux-x64-gnu
@@ -116,7 +103,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - name: Build Node 18-22 (Debian 10 image for glibc compat)
+      - name: Build and test Node 18-22, package (Debian 10)
         run: |
           docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
             -e NODE_VERSIONS="18 20 22" \
@@ -141,9 +128,19 @@ jobs:
               done
               cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
               . prebuild/Linux/bundle.sh
+              # Test each version
+              for NODE_VER in $NODE_VERSIONS; do
+                export PATH=/opt/node-${NODE_VER}/bin:$ORIG_PATH
+                echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
+                node test/smoke.js
+              done
+              # Package
+              export PATH=/opt/node-22/bin:$ORIG_PATH
+              node prebuild/package-platform.js linux-arm64-gnu build/Release
             '
-      - name: Build Node 24 (bookworm image for C++20/gcc 12)
+      - name: Build and test Node 24 (bookworm)
         run: |
+          cp -r build/Release /tmp/prebuilt-release
           docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
             ghcr.io/shqld/prebuilt-canvas/builder:bookworm-arm64 bash -c '
               set -ex
@@ -160,34 +157,9 @@ jobs:
               npx --yes node-gyp rebuild -j 2
               cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
             '
-      - name: Test binary (all Node versions)
-        run: |
-          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
-            chearon/canvas-prebuilt-arm:1 bash -c '
-              set -ex
-              for NODE_VER in 18 20 22; do
-                export PATH=/opt/node-${NODE_VER}/bin:$PATH
-                echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-                node test/smoke.js
-              done
-            '
-          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
-            ghcr.io/shqld/prebuilt-canvas/builder:bookworm-arm64 bash -c '
-              mkdir -p /opt/node-24
-              curl -fsSL "https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt" > /tmp/shasums.txt
-              NODE_FULL=$(grep "linux-arm64.tar.gz" /tmp/shasums.txt | head -1 | awk "{print \$2}" | sed "s/-linux-arm64.tar.gz//" | sed "s/node-v//")
-              curl -fsSL "https://nodejs.org/dist/v${NODE_FULL}/node-v${NODE_FULL}-linux-arm64.tar.gz" | tar -xz -C /opt/node-24 --strip-components=1
-              export PATH=/opt/node-24/bin:$PATH
-              echo "=== Testing with Node $(node --version) (ABI $(node -p process.versions.modules)) ==="
-              node test/smoke.js
-            '
-      - name: Package
-        run: |
-          docker run --rm -v $GITHUB_WORKSPACE:/work -w /work \
-            chearon/canvas-prebuilt-arm:1 bash -c '
-              export PATH=/opt/node-22/bin:$PATH
-              node prebuild/package-platform.js linux-arm64-gnu build/Release
-            '
+          cp /tmp/prebuilt-release/canvas-node-v*.node build/Release/
+          cp /tmp/prebuilt-release/*.so* build/Release/
+          cp /tmp/prebuilt-release/package.json build/Release/ 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: canvas-linux-arm64-gnu
