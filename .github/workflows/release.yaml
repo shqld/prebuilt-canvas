@@ -40,6 +40,7 @@ jobs:
         run: |
           set -ex
           ORIG_PATH=$PATH
+          mkdir -p /tmp/prebuilt-nodes
           cp prebuild/Linux/binding.gyp binding.gyp
           for NODE_VER in $NODE_VERSIONS; do
             echo "=== Installing Node $NODE_VER ==="
@@ -53,8 +54,9 @@ jobs:
             rm -rf node_modules
             npm install --ignore-scripts
             npx --yes node-gyp rebuild -j 2
-            mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+            cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
           done
+          cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
           . prebuild/Linux/bundle.sh
       - name: Test binary
         run: |
@@ -80,6 +82,7 @@ jobs:
         run: |
           set -ex
           ORIG_PATH=$PATH
+          mkdir -p /tmp/prebuilt-nodes
           cp prebuild/Linux/binding.gyp binding.gyp
           for NODE_VER in $NODE_VERSIONS; do
             echo "=== Installing Node $NODE_VER ==="
@@ -93,8 +96,9 @@ jobs:
             rm -rf node_modules
             npm install --ignore-scripts
             npx --yes node-gyp rebuild -j 2
-            mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+            cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
           done
+          cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
           . prebuild/Linux/bundle.sh
       - name: Test binary
         run: |
@@ -129,6 +133,7 @@ jobs:
             set -ex
             export PATH=/usr/local/bin:\$PATH
             source ~/.nvm/nvm.sh
+            mkdir -p /tmp/prebuilt-nodes
             for NODE_VER in $NODE_VERSIONS; do
               nvm install \$NODE_VER && nvm use \$NODE_VER
               ABI=\$(node -p 'process.versions.modules')
@@ -137,8 +142,9 @@ jobs:
               npm install --ignore-scripts
               cp prebuild/macOS/binding.gyp binding.gyp
               npx --yes node-gyp rebuild -j 2
-              mv build/Release/canvas.node build/Release/canvas-node-v\${ABI}.node
+              cp build/Release/canvas.node /tmp/prebuilt-nodes/canvas-node-v\${ABI}.node
             done
+            cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
             pip3 install --user --break-system-packages macpack
             . prebuild/macOS/bundle.sh
           "
@@ -176,6 +182,7 @@ jobs:
           set -ex
           curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
           source ~/.nvm/nvm.sh
+          mkdir -p /tmp/prebuilt-nodes
           for NODE_VER in $NODE_VERSIONS; do
             nvm install $NODE_VER && nvm use $NODE_VER
             ABI=$(node -p "process.versions.modules")
@@ -184,8 +191,9 @@ jobs:
             npm install --ignore-scripts
             cp prebuild/macOS/binding.gyp binding.gyp
             npx --yes node-gyp rebuild -j 2
-            mv build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+            cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
           done
+          cp /tmp/prebuilt-nodes/canvas-node-v*.node build/Release/
           . prebuild/macOS/bundle.sh
       - name: Sign
         run: |
@@ -223,6 +231,7 @@ jobs:
         shell: pwsh
         run: |
           msys2 -c "cp prebuild/Windows/binding.gyp binding.gyp"
+          New-Item -ItemType Directory -Force "$env:TEMP\prebuilt-nodes" | Out-Null
           foreach ($NODE_VER in @(18, 20, 22, 24)) {
             Write-Host "=== Installing Node $NODE_VER ==="
             $shasums = Invoke-WebRequest -Uri "https://nodejs.org/dist/latest-v${NODE_VER}.x/SHASUMS256.txt" -UseBasicParsing
@@ -242,8 +251,9 @@ jobs:
             if (Test-Path "$env:LOCALAPPDATA\npm-cache\_npx") { Remove-Item -Recurse -Force "$env:LOCALAPPDATA\npm-cache\_npx" }
             npm install --ignore-scripts
             npx --yes node-gyp rebuild -j 2
-            Move-Item -Force build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+            Copy-Item build/Release/canvas.node "$env:TEMP\prebuilt-nodes\canvas-node-v${ABI}.node"
           }
+          Copy-Item "$env:TEMP\prebuilt-nodes\canvas-node-v*.node" build/Release/
       - name: Bundle
         shell: msys2 {0}
         run: . prebuild/Windows/bundle.sh
