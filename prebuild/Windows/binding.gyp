@@ -25,6 +25,8 @@
         'HAVE_JPEG',
         'HAVE_RSVG',
         'HAVE_BOOLEAN', # or jmorecfg.h tries to define it
+        'NOMINMAX', # prevent windows min/max macros conflicting with std::min/max
+        '_USE_MATH_DEFINES', # for M_PI
         '_USE_MATH_DEFINES' # for M_PI
       ],
       'libraries': [
