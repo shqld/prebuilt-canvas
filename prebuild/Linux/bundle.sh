@@ -1,7 +1,12 @@
 #!/bin/bash
 set -x
 
-apt-get update
+# Debian 10 (buster) repos are archived
+sed -i '
+  s|deb.debian.org/debian|archive.debian.org/debian|g;
+  s|security.debian.org/debian-security|archive.debian.org/debian-security|g;
+' /etc/apt/sources.list 2>/dev/null || true
+apt-get -o Acquire::Check-Valid-Until=false update
 apt install -y patchelf pax-utils
 
 # Use any .node binary to determine shared library dependencies
