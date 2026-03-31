@@ -88,6 +88,7 @@ jobs:
               npm install --ignore-scripts --no-optional
               npx --yes node-gyp rebuild -j 2
               cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+              chmod -R 777 build/Release
             '
           # Restore Node 18-22 artifacts
           cp /tmp/prebuilt-release/canvas-node-v*.node build/Release/
@@ -156,6 +157,7 @@ jobs:
               npm install --ignore-scripts --no-optional
               npx --yes node-gyp rebuild -j 2
               cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
+              chmod -R 777 build/Release
             '
           cp /tmp/prebuilt-release/canvas-node-v*.node build/Release/
           cp /tmp/prebuilt-release/*.so* build/Release/
