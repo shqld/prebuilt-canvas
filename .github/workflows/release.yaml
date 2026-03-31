@@ -53,7 +53,7 @@ jobs:
                 ABI=$(node -p "process.versions.modules")
                 echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
                 rm -rf node_modules
-                npm install --ignore-scripts
+                npm install --ignore-scripts --no-optional
                 npx --yes node-gyp rebuild -j 2
                 cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
               done
@@ -85,7 +85,7 @@ jobs:
               echo "Building for Node 24 ($NODE_FULL, ABI $ABI)..."
               cp prebuild/Linux/binding.gyp binding.gyp
               rm -rf node_modules
-              npm install --ignore-scripts
+              npm install --ignore-scripts --no-optional
               npx --yes node-gyp rebuild -j 2
               cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
             '
@@ -122,7 +122,7 @@ jobs:
                 ABI=$(node -p "process.versions.modules")
                 echo "Building for Node $NODE_VER ($NODE_FULL, ABI $ABI)..."
                 rm -rf node_modules
-                npm install --ignore-scripts
+                npm install --ignore-scripts --no-optional
                 npx --yes node-gyp rebuild -j 2
                 cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
               done
@@ -153,7 +153,7 @@ jobs:
               echo "Building for Node 24 ($NODE_FULL, ABI $ABI)..."
               cp prebuild/Linux/binding.gyp binding.gyp
               rm -rf node_modules
-              npm install --ignore-scripts
+              npm install --ignore-scripts --no-optional
               npx --yes node-gyp rebuild -j 2
               cp build/Release/canvas.node "build/Release/canvas-node-v${ABI}.node"
             '
@@ -191,7 +191,7 @@ jobs:
               ABI=\$(node -p 'process.versions.modules')
               echo \"Building for Node \$NODE_VER (ABI \$ABI)...\"
               rm -rf node_modules ~/.npm/_npx
-              npm install --ignore-scripts
+              npm install --ignore-scripts --no-optional
               cp prebuild/macOS/binding.gyp binding.gyp
               npx --yes node-gyp rebuild -j 2
               cp build/Release/canvas.node /tmp/prebuilt-nodes/canvas-node-v\${ABI}.node
@@ -245,7 +245,7 @@ jobs:
             ABI=$(node -p "process.versions.modules")
             echo "Building for Node $NODE_VER (ABI $ABI)..."
             rm -rf node_modules ~/.npm/_npx
-            npm install --ignore-scripts
+            npm install --ignore-scripts --no-optional
             cp prebuild/macOS/binding.gyp binding.gyp
             npx --yes node-gyp rebuild -j 2
             cp build/Release/canvas.node "/tmp/prebuilt-nodes/canvas-node-v${ABI}.node"
@@ -311,7 +311,7 @@ jobs:
             Write-Host "Building for Node $NODE_VER (v${nodeVer}, ABI $ABI)..."
             if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }
             if (Test-Path "$env:LOCALAPPDATA\npm-cache\_npx") { Remove-Item -Recurse -Force "$env:LOCALAPPDATA\npm-cache\_npx" }
-            npm install --ignore-scripts
+            npm install --ignore-scripts --no-optional
             npx --yes node-gyp rebuild -j 2
             Copy-Item build/Release/canvas.node "$env:TEMP\prebuilt-nodes\canvas-node-v${ABI}.node"
           }
