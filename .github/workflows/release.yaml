@@ -353,6 +353,9 @@ jobs:
       - build-darwin-arm64
       - build-win32-x64
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -372,7 +375,7 @@ jobs:
           for dir in artifacts/canvas-*/; do
             echo "Publishing $(cat $dir/package.json | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).name')"
             cd "$dir"
-            npm publish --access public
+            npm publish --access public --provenance
             cd "$GITHUB_WORKSPACE"
           done
 
@@ -403,7 +406,7 @@ jobs:
       - name: Publish main package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
 
   verify:
     name: Verify (${{ matrix.name }})
